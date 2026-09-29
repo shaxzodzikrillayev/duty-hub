@@ -32,6 +32,15 @@ export function listAll(): UserRow[] {
   );
 }
 
+/** Активные пользователи для списка быстрого входа (без логинов и хешей). */
+export function listActive(): Pick<UserRow, 'id' | 'first_name' | 'last_name' | 'role'>[] {
+  return getDb().all<Pick<UserRow, 'id' | 'first_name' | 'last_name' | 'role'>>(
+    `SELECT id, first_name, last_name, role FROM users WHERE is_active = 1
+     ORDER BY CASE role WHEN 'CURATOR' THEN 0 WHEN 'MONITOR' THEN 1 ELSE 2 END,
+       position ASC, last_name COLLATE NOCASE ASC`,
+  );
+}
+
 export function listByRoles(...roles: Role[]): UserRow[] {
   if (roles.length === 0) return [];
   const placeholders = roles.map(() => '?').join(',');
@@ -54,19 +63,21 @@ export function insertUser(input: {
   passwordHash: string;
   role: Role;
   position?: number;
+  pinHash?: string;
 }): UserRow {
   const db = getDb();
   const ts = nowISO();
   const position = input.position ?? nextPosition();
   const { lastInsertRowid } = db.run(
-    `INSERT INTO users (first_name, last_name, username, password_hash, role, position, is_active, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+    `INSERT INTO users (first_name, last_name, username, password_hash, role, position, is_active, pin_hash, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
     input.firstName,
     input.lastName,
     input.username,
     input.passwordHash,
     input.role,
     position,
+    input.pinHash ?? null,
     ts,
     ts,
   );

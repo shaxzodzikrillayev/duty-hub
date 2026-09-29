@@ -143,6 +143,13 @@ const MIGRATIONS: { name: string; sql: string }[] = [
       CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_log (created_at DESC);
     `,
   },
+  {
+    name: '002_pin_login',
+    sql: `
+      ALTER TABLE users ADD COLUMN pin_hash TEXT;
+      CREATE INDEX IF NOT EXISTS idx_users_name ON users (lower(last_name), lower(first_name));
+    `,
+  },
 ];
 
 export function migrate(): void {

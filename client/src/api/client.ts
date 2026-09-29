@@ -90,6 +90,9 @@ export const api = {
       role: Role;
       secret?: string;
     }) => request<{ user: User }>('POST', '/api/auth/register', payload),
+    people: () => request<{ people: { id: number; firstName: string; lastName: string; fullName: string; role: Role }[] }>('GET', '/api/auth/people'),
+    loginPin: (userId: number, pin: string) =>
+      request<{ user: User }>('POST', '/api/auth/login-pin', { userId, pin }),
     logout: () => request<{ ok: boolean }>('POST', '/api/auth/logout', {}),
     changePassword: (currentPassword: string, newPassword: string) =>
       request<{ ok: boolean }>('POST', '/api/auth/change-password', { currentPassword, newPassword }),

@@ -46,6 +46,15 @@ const loginSchema = z.object({
   password: z.string().min(1, 'Введите пароль'),
 });
 
+/** Быстрый вход: выбрал себя по фамилии и имени, ввёл 4 цифры PIN. */
+const pinLoginSchema = z.object({
+  userId: z.number().int().positive(),
+  pin: z
+    .string()
+    .trim()
+    .regex(/^\d{4}$/, 'PIN состоит из 4 цифр'),
+});
+
 const MAX_ADMINS: Record<'MONITOR' | 'CURATOR', number> = { MONITOR: 3, CURATOR: 3 };
 
 /** Секретные коды существуют только на сервере (process.env) и проверяются здесь. */
@@ -127,6 +136,37 @@ authRouter.post(
     issueSession(res, { sub: user.id, role: user.role, username: user.username });
     const csrfToken = issueCsrfToken(res);
     res.json({ user: usersRepo.toPublicUser(user), csrfToken });
+  }),
+);
+
+authRouter.post(
+  '/login-pin',
+  authLimiter,
+  asyncHandler(async (req, res) => {
+    const parsed = pinLoginSchema.safeParse(req.body);
+    if (!parsed.success) throw badRequest('Выберите себя и введите 4 цифры PIN', 'VALIDATION');
+
+    const user = usersRepo.findById(parsed.data.userId);
+    const hash = user?.pin_hash ?? '$2a$10$invalidinvalidinvalidinvalidinvalidinvalidinvalidinvalidin';
+    const ok = await verifyPassword(parsed.data.pin, hash);
+
+    if (!user || !ok) throw unauthorized('Неверный PIN');
+    if (user.is_active !== 1) throw forbidden('Аккаунт отключён');
+
+    issueSession(res, { sub: user.id, role: user.role, username: user.username });
+    const csrfToken = issueCsrfToken(res);
+    res.json({ user: usersRepo.toPublicUser(user), csrfToken });
+  }),
+);
+
+/** Список класса для быстрого входа: только имена и роль, без логинов. */
+authRouter.get(
+  '/people',
+  asyncHandler(async (_req, res) => {
+    const people = usersRepo
+      .listActive()
+      .map((u) => ({ id: u.id, firstName: u.first_name, lastName: u.last_name, fullName: `${u.last_name} ${u.first_name}`, role: u.role }));
+    res.json({ people });
   }),
 );
 

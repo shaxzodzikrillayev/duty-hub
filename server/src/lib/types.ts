@@ -31,6 +31,7 @@ export interface UserRow {
   last_name: string;
   username: string;
   password_hash: string;
+  pin_hash: string | null;
   role: Role;
   position: number;
   is_active: number;

@@ -12,7 +12,8 @@ console.log('[db:reset] Файл базы удалён. Создаю занов�
 
 migrate();
 const result = seedDatabase();
-console.log('[db:reset] Готово:', result);
+console.log('[db:reset] Готово: куратор + ' + result.students + ' учеников, ' + result.monitors + ' староста');
 console.log('[db:reset] Куратор: curator /', config.seedCurator.password);
-console.log('[db:reset] Учеников, старосты и графика нет — добавьте их через интерфейс.');
+for (const p of result.pins) console.log('  ' + p.role.padEnd(9) + p.person.padEnd(34) + ' PIN ' + p.pin);
+console.log('[db:reset] Графика дежурств нет — староста составит его сам.');
 closeDb();
