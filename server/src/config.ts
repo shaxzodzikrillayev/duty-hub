@@ -50,6 +50,7 @@ function required(name: string): string {
 
 const NODE_ENV = process.env.NODE_ENV ?? 'development';
 const isProd = NODE_ENV === 'production';
+const isVercel = Boolean(process.env.VERCEL) || Boolean(process.env.VERCEL_ENV);
 
 const jwtSecret = process.env.JWT_SECRET?.trim() || '';
 if (isProd && (jwtSecret.length < 32 || jwtSecret === 'dev-only-secret-change-me-3f9a1c7b52e8461d')) {
@@ -64,7 +65,7 @@ if (monitorSecret === curatorSecret) {
   throw new Error('MONITOR_SECRET и CURATOR_SECRET должны различаться');
 }
 
-const databasePathRaw = process.env.DATABASE_PATH?.trim() || './data/dutyhub.db';
+const databasePathRaw = process.env.DATABASE_PATH?.trim() || (isVercel ? '/tmp/dutyhub/dutyhub.db' : './data/dutyhub.db');
 const databaseFile = path.isAbsolute(databasePathRaw)
   ? databasePathRaw
   : path.resolve(SERVER_ROOT, databasePathRaw);
@@ -74,6 +75,7 @@ fs.mkdirSync(path.dirname(databaseFile), { recursive: true });
 export const config = {
   env: NODE_ENV,
   isProd,
+  isVercel,
   port: Number(process.env.PORT ?? 4000),
   jwtSecret: jwtSecret || crypto.randomBytes(32).toString('hex'),
   jwtTtl: process.env.JWT_TTL?.trim() || '7d',
@@ -90,8 +92,12 @@ export const config = {
     .map((o) => o.trim())
     .filter(Boolean),
   bcryptRounds: isProd ? 12 : 10,
-  /** Пароль, который выдаётся ученикам при первичном заполнении базы */
-  defaultSeedPassword: process.env.SEED_PASSWORD?.trim() || 'Duty12345',
+  /** Учётные данные стартового аккаунта (только для первичного заполнения БД) */
+  seedCurator: {
+    firstName: process.env.SEED_CURATOR_FIRST_NAME?.trim() || 'Нилюфар',
+    lastName: process.env.SEED_CURATOR_LAST_NAME?.trim() || 'Абдусаматова',
+    password: process.env.SEED_CURATOR_PASSWORD?.trim() || 'Curator12345',
+  },
 } as const;
 
 export type AppConfig = typeof config;

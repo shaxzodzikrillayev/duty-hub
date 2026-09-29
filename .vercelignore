@@ -1,0 +1,6 @@
+.env
+.env.*
+server/data
+client/dist
+server/dist
+**/*.log

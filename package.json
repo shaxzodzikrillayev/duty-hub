@@ -1,8 +1,11 @@
 {
   "name": "duty-hub-5g",
-  "private": true,
   "version": "1.0.0",
-  "description": "Duty Hub 5 «Г» — система управления дежурствами класса",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "24.x"
+  },
   "scripts": {
     "setup": "npm run install:all",
     "install:all": "npm --prefix server install --no-audit --no-fund && npm --prefix client install --no-audit --no-fund",
@@ -14,12 +17,21 @@
     "typecheck": "npm --prefix server run typecheck && npm --prefix client run typecheck",
     "start": "npm --prefix server run start",
     "seed": "npm --prefix server run seed",
-    "db:reset": "npm --prefix server run db:reset"
+    "db:reset": "npm --prefix server run db:reset",
+    "deploy:vercel": "vercel --prod"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.5.0",
+    "helmet": "^8.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "zod": "^3.24.1"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"
-  },
-  "engines": {
-    "node": ">=20"
   }
 }

@@ -180,6 +180,29 @@ audit_log (id, actor_id, actor_name, actor_role, action, entity_type, entity_id,
 
 ---
 
+## Развёртывание на Vercel (serverless)
+
+`vercel.json` + папка `api/` превращают Express в Vercel Functions: все `/api/*` идут в `api/index.ts`, статика — `client/dist`.
+
+**Переменные окружения (обязательно в Vercel → Settings → Environment Variables):**
+
+| Переменная       | Обязательна | Зачем |
+| ---------------- | ----------- | ----- |
+| `JWT_SECRET`     | да | случайная строка **от 32 символов**, иначе сервер не стартует |
+| `MONITOR_SECRET` | да | код регистрации старосты |
+| `CURATOR_SECRET` | да | код регистрации куратора (должен отличаться от MONITOR_SECRET) |
+| `SEED_CURATOR_PASSWORD` | нет | пароль стартового куратора (по умолчанию `Curator12345`) |
+| `ALLOWED_ORIGINS` | нет | доп. домены, например `https://duty-hub.vercel.app` (same-origin работает сам) |
+
+`DATABASE_PATH` задавать не нужно: на Vercel база автоматически создаётся в `/tmp`.
+
+
+
+> ⚠️ Файловая БД в `/tmp` живёт только внутри одного инстанса. Vercel Functions
+> не имеют постоянного хранилища, поэтому при холодном старте база создаётся заново
+> (аккаунт куратора заводится автоматически). Для постоянных данных подключите
+> внешнее хранилище (Turso/Postgres/Neon) через `server/src/db`.
+
 ## Развёртывание
 
 ```bash
