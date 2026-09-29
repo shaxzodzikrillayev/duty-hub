@@ -1,0 +1,25 @@
+{
+  "name": "duty-hub-5g",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Duty Hub 5 «Г» — система управления дежурствами класса",
+  "scripts": {
+    "setup": "npm run install:all",
+    "install:all": "npm --prefix server install --no-audit --no-fund && npm --prefix client install --no-audit --no-fund",
+    "postinstall": "node scripts/postinstall.mjs",
+    "dev": "concurrently -n server,client -c cyan,magenta \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:server": "npm --prefix server run dev",
+    "dev:client": "npm --prefix client run dev",
+    "build": "npm --prefix server run build && npm --prefix client run build",
+    "typecheck": "npm --prefix server run typecheck && npm --prefix client run typecheck",
+    "start": "npm --prefix server run start",
+    "seed": "npm --prefix server run seed",
+    "db:reset": "npm --prefix server run db:reset"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
