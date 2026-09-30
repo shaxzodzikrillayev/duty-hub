@@ -9,6 +9,7 @@ import { config, PROJECT_ROOT } from './config.js';
 import { getDb, migrate } from './db/index.js';
 import { ensureSeed } from './db/seed.js';
 import { HttpError } from './lib/errors.js';
+import { issueCsrfToken } from './lib/tokens.js';
 import { csrfProtection } from './middleware/security.js';
 import { authRouter } from './routes/auth.routes.js';
 import { usersRouter } from './routes/users.routes.js';
@@ -65,6 +66,15 @@ app.use('/api', csrfProtection);
 
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true, env: config.env, time: new Date().toISOString() });
+});
+
+/**
+ * Алиас для /api/auth/csrf. Нужен там, где прокси или рерайт искажает
+ * вложенный путь /api/auth/*: клиент пробует оба адреса и не остаётся
+ * без токена. GET — запрос сам попадает в safe-methods и CSRF-проверку не проходит.
+ */
+app.get('/api/csrf', (_req, res) => {
+  res.json({ csrfToken: issueCsrfToken(res) });
 });
 
 app.use('/api/auth', authRouter);

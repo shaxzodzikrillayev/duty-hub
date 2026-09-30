@@ -21,36 +21,77 @@ export class ApiError extends Error {
 
 const CSRF_COOKIE = 'dh_csrf';
 
+/**
+ * Адреса выдачи CSRF-токена. Второй — алиас на случай, если прокси или
+ * рерайт искажает вложенный путь /api/auth/*.
+ */
+const CSRF_URLS = ['/api/auth/csrf', '/api/csrf'];
+
+/**
+ * Вход, PIN-вход и регистрация идут БЕЗ предзапроса токена: сессии у клиента
+ * ещё нет, сервер выдаёт сессию вместе с CSRF-кукой в ответе на эти запросы.
+ * Раньше клиент обязан был сначала сходить на /api/auth/csrf, и любой сбой
+ * этого запроса (404 и т.п.) полностью ломал вход и регистрацию.
+ */
+const CSRF_EXEMPT_URLS = ['/api/auth/login', '/api/auth/login-pin', '/api/auth/register'];
+
 function readCookie(name: string): string | null {
   const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
   return match ? decodeURIComponent(match[1]!) : null;
 }
 
-let csrfReady: Promise<void> | null = null;
-
-/** Клиент всегда запрашивает CSRF-токен перед первой мутацией. */
-async function ensureCsrf(): Promise<void> {
-  if (readCookie(CSRF_COOKIE)) return;
-  if (!csrfReady) {
-    csrfReady = fetch('/api/auth/csrf', { credentials: 'same-origin' })
-      .then((r) => (r.ok ? undefined : Promise.reject(new ApiError(r.status, 'Не удалось получить CSRF-токен'))))
-      .finally(() => {
-        csrfReady = null;
-      });
-  }
-  await csrfReady;
+function clearCookie(name: string): void {
+  document.cookie = `${name}=; Max-Age=0; path=/`;
 }
 
-async function request<T>(method: string, url: string, body?: unknown): Promise<T> {
-  if (method !== 'GET' && method !== 'HEAD') {
-    await ensureCsrf();
-  }
+function isMutating(method: string): boolean {
+  return method !== 'GET' && method !== 'HEAD';
+}
 
+function needsCsrf(method: string, url: string): boolean {
+  if (!isMutating(method)) return false;
+  const path = url.split('?')[0] ?? url;
+  return !CSRF_EXEMPT_URLS.some((exempt) => path === exempt);
+}
+
+let csrfInflight: Promise<void> | null = null;
+
+/**
+ * best-effort предзапрос токена. Никогда не бросает: если эндпоинт недоступен,
+ * запрос всё равно уходит, а при 403 CSRF_INVALID клиент сам обновит токен
+ * и повторит его один раз.
+ */
+function ensureCsrf(): Promise<void> {
+  if (readCookie(CSRF_COOKIE)) return Promise.resolve();
+  if (csrfInflight) return csrfInflight;
+
+  csrfInflight = (async () => {
+    for (const url of CSRF_URLS) {
+      try {
+        const res = await fetch(url, {
+          method: 'GET',
+          credentials: 'same-origin',
+          headers: { Accept: 'application/json' },
+        });
+        if (res.ok) return;
+        if (res.status !== 404) break;
+      } catch {
+        break;
+      }
+    }
+  })().finally(() => {
+    csrfInflight = null;
+  });
+
+  return csrfInflight;
+}
+
+async function send<T>(method: string, url: string, body: unknown, isRetry: boolean): Promise<T> {
   const headers: Record<string, string> = {};
   if (body !== undefined) headers['Content-Type'] = 'application/json';
 
   const csrf = readCookie(CSRF_COOKIE);
-  if (csrf && method !== 'GET') headers['X-CSRF-Token'] = csrf;
+  if (csrf && isMutating(method)) headers['X-CSRF-Token'] = csrf;
 
   const res = await fetch(url, {
     method,
@@ -69,12 +110,30 @@ async function request<T>(method: string, url: string, body?: unknown): Promise<
     data = text;
   }
 
-  if (!res.ok) {
-    const payload = (data ?? {}) as { error?: string; code?: string };
-    throw new ApiError(res.status, payload.error ?? 'Ошибка запроса', payload.code ?? 'ERROR');
+  if (res.ok) return data as T;
+
+  const payload = (data ?? {}) as { error?: string; code?: string };
+  const error = new ApiError(
+    res.status,
+    payload.error ?? 'Ошибка запроса',
+    payload.code ?? 'ERROR',
+  );
+
+  // Кука устарела или потерялась — обновляем токен и повторяем ровно один раз.
+  if (error.status === 403 && error.code === 'CSRF_INVALID' && isMutating(method) && !isRetry) {
+    clearCookie(CSRF_COOKIE);
+    await ensureCsrf();
+    return send<T>(method, url, body, true);
   }
 
-  return data as T;
+  throw error;
+}
+
+async function request<T>(method: string, url: string, body?: unknown): Promise<T> {
+  if (needsCsrf(method, url)) {
+    await ensureCsrf();
+  }
+  return send<T>(method, url, body, false);
 }
 
 export const api = {

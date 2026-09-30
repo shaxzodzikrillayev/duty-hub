@@ -16,6 +16,9 @@ export const unauthorized = (m = 'Требуется авторизация') =>
 export const forbidden = (m = 'Недостаточно прав') => new HttpError(403, m, 'FORBIDDEN');
 export const notFound = (m = 'Не найдено') => new HttpError(404, m, 'NOT_FOUND');
 export const conflict = (m: string) => new HttpError(409, m, 'CONFLICT');
+/** Отдельный код: клиент по нему понимает, что нужно обновить CSRF-токен и повторить запрос. */
+export const csrfInvalid = (m = 'Отсутствует или неверный CSRF-токен') =>
+  new HttpError(403, m, 'CSRF_INVALID');
 
 /** Обёртка для async-обработчиков, чтобы не дублировать try/catch. */
 export function asyncHandler<T extends Request = Request>(

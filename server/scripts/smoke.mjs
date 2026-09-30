@@ -167,8 +167,21 @@ async function main() {
     });
     check('запрос с чужим Origin отклоняется', badOrigin.status === 403, `(${badOrigin.status})`);
 
-    const noCsrf = await anon.post('/api/auth/login', { username: 'x', password: 'y' }, { withCsrf: false });
+    const noCsrf = await anon.post('/api/auth/logout', {}, { withCsrf: false });
     check('мутация без CSRF-токена отклоняется', noCsrf.status === 403, `(${noCsrf.status})`);
+
+    // Вход/регистрация идут без предзапроса токена: сессии ещё нет, а сервер
+    // выдаёт её вместе с CSRF-кукой. Раньше нужен был отдельный запрос на
+    // /api/auth/csrf, и его сбой полностью ломал вход.
+    const noCsrfLogin = await anon.post('/api/auth/login', { username: 'x', password: 'y' }, { withCsrf: false });
+    check(
+      'вход не требует предзапроса CSRF',
+      noCsrfLogin.status !== 403,
+      `(${noCsrfLogin.status} ${noCsrfLogin.data?.code ?? ''})`,
+    );
+
+    const aliasCsrf = await new Client().get('/api/csrf');
+    check('алиас /api/csrf выдаёт токен', Boolean(aliasCsrf.data?.csrfToken));
 
     const student = new Client();
     await bootstrapCsrf(student);
