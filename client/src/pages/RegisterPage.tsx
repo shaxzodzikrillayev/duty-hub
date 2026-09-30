@@ -17,11 +17,8 @@ export function RegisterPage() {
   const [lastName, setLastName] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [secret, setSecret] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-
-  const needsSecret = role !== 'STUDENT';
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -34,7 +31,6 @@ export function RegisterPage() {
         username: username.trim(),
         password,
         role,
-        secret: needsSecret ? secret : undefined,
       });
       navigate('/', { replace: true });
     } catch (err) {
@@ -47,7 +43,7 @@ export function RegisterPage() {
   return (
     <AuthLayout
       title="Регистрация"
-      subtitle="Ученик регистрируется сам, для старосты и куратора нужен секретный код"
+      subtitle="Четыре поля и роль — аккаунт готов сразу"
       footer={
         <>
           Уже есть аккаунт?{' '}
@@ -145,26 +141,6 @@ export function RegisterPage() {
             minLength={6}
           />
         </div>
-
-        {needsSecret ? (
-          <div className="animate-fade-up">
-            <label className="label" htmlFor="reg-secret">
-              Секретный код роли «{ROLE_META[role].label}»
-            </label>
-            <input
-              id="reg-secret"
-              type="password"
-              className="field"
-              value={secret}
-              onChange={(e) => setSecret(e.target.value)}
-              placeholder="код хранится только на сервере"
-              required
-            />
-            <p className="mt-1.5 text-xs text-slate-500">
-              Код проверяется на сервере и никогда не отправляется в браузер.
-            </p>
-          </div>
-        ) : null}
 
         <FormError message={error} />
 

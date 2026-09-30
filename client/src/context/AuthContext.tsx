@@ -18,7 +18,6 @@ export interface RegisterPayload {
   username: string;
   password: string;
   role: Role;
-  secret?: string;
 }
 
 export const AuthContext = createContext<AuthState | null>(null);

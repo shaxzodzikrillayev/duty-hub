@@ -23,10 +23,7 @@ const env = {
   PORT: String(PORT),
   DATABASE_PATH: DB_FILE,
   JWT_SECRET: crypto.randomBytes(32).toString('hex'),
-  MONITOR_SECRET: 'Nulufar6789',
-  CURATOR_SECRET: 'SmokeTest-Curator-42',
   ALLOWED_ORIGINS: '',
-  SEED_PASSWORD: 'Duty12345',
 };
 
 let passed = 0;
@@ -192,24 +189,40 @@ async function main() {
       password: 'secret123',
       role: 'STUDENT',
     });
-    check('ученик регистрируется без секрета', regStudent.status === 201, JSON.stringify(regStudent.data));
+    check('ученик регистрируется', regStudent.status === 201, JSON.stringify(regStudent.data));
     const studentId = regStudent.data?.user?.id;
     check('роль ученика присвоена', regStudent.data?.user?.role === 'STUDENT');
     check('passwordHash не отдаётся клиенту', !JSON.stringify(regStudent.data).includes('passwordHash'));
 
-    const noSecret = await (async () => {
+    // Секретных кодов больше нет: роль выбирается свободно.
+    const monitorFree = await (async () => {
       const c = new Client();
       await bootstrapCsrf(c);
       return c.post('/api/auth/register', { firstName: 'Тест', lastName: 'Староста', username: 'test.mon1', password: 'secret123', role: 'MONITOR' });
     })();
-    check('староста без секрета не регистрируется', noSecret.status === 403, `(${noSecret.status})`);
+    check('староста регистрируется без кода', monitorFree.status === 201, `(${monitorFree.status})`);
+    check('роль старосты присвоена', monitorFree.data?.user?.role === 'MONITOR');
 
-    const wrongSecret = await (async () => {
+    const curatorFree = await (async () => {
       const c = new Client();
       await bootstrapCsrf(c);
-      return c.post('/api/auth/register', { firstName: 'Тест', lastName: 'Староста', username: 'test.mon2', password: 'secret123', role: 'MONITOR', secret: 'неправильный' });
+      return c.post('/api/auth/register', { firstName: 'Тест', lastName: 'Куратор', username: 'test.cur.free', password: 'secret123', role: 'CURATOR' });
     })();
-    check('староста с неверным секретом не регистрируется', wrongSecret.status === 403, `(${wrongSecret.status})`);
+    check('куратор регистрируется без кода', curatorFree.status === 201, `(${curatorFree.status})`);
+
+    const badRole = await (async () => {
+      const c = new Client();
+      await bootstrapCsrf(c);
+      return c.post('/api/auth/register', { firstName: 'Тест', lastName: 'Староста', username: 'test.mon2', password: 'secret123', role: 'ДИРЕКТОР' });
+    })();
+    check('несуществующая роль отклоняется', badRole.status === 400, `(${badRole.status})`);
+
+    const dupe = await (async () => {
+      const c = new Client();
+      await bootstrapCsrf(c);
+      return c.post('/api/auth/register', { firstName: 'Тест', lastName: 'Дубль', username: 'test.student', password: 'secret123', role: 'STUDENT' });
+    })();
+    check('занятый логин отклоняется', dupe.status === 409, `(${dupe.status})`);
 
     section('2. Права ученика');
     check('гость не видит список класса', (await anon.get('/api/users')).status === 401);
@@ -233,7 +246,7 @@ async function main() {
     const othersHistory = await student.get(`/api/duties/history/${studentId + 999}`);
     check('ученик не может открыть чужую историю', othersHistory.status === 403, `(${othersHistory.status})`);
 
-    section('3. Староста (секретный код)');
+    section('3. Староста');
     const monitor = new Client();
     await bootstrapCsrf(monitor);
     const regMonitor = await monitor.post('/api/auth/register', {
@@ -242,9 +255,8 @@ async function main() {
       username: 'test.monitor',
       password: 'secret123',
       role: 'MONITOR',
-      secret: 'Nulufar6789',
     });
-    check('староста регистрируется по секрету', regMonitor.status === 201, JSON.stringify(regMonitor.data));
+    check('староста регистрируется', regMonitor.status === 201, JSON.stringify(regMonitor.data));
 
     const roster = await monitor.get('/api/users');
     const monitorId = roster.data?.users?.find((u) => u.username === 'test.student')?.id ?? studentId;
@@ -289,7 +301,7 @@ async function main() {
     const hasStatusChange = monitorAudit.data?.items?.some((i) => i.action === 'DUTY_UPDATE' && i.summary.includes('«Дежурил» → «Не дежурил»'));
     check('в журнале есть запись о смене статуса', Boolean(hasStatusChange));
 
-    section('4. Куратор (секретный код)');
+    section('4. Куратор');
     const curator = new Client();
     await bootstrapCsrf(curator);
     const regCurator = await curator.post('/api/auth/register', {
@@ -298,9 +310,8 @@ async function main() {
       username: 'test.curator',
       password: 'secret123',
       role: 'CURATOR',
-      secret: 'SmokeTest-Curator-42',
     });
-    check('куратор регистрируется по секрету', regCurator.status === 201, JSON.stringify(regCurator.data));
+    check('куратор регистрируется', regCurator.status === 201, JSON.stringify(regCurator.data));
 
     const curatorDash = await curator.get('/api/dashboard');
     check('дашборд куратора содержит данные класса', curatorDash.status === 200 && curatorDash.data?.today?.counts?.classSize > 0);

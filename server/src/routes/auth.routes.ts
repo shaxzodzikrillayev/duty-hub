@@ -1,11 +1,10 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
-import { config } from '../config.js';
 import { asyncHandler, badRequest, conflict, forbidden, unauthorized } from '../lib/errors.js';
-import { hashPassword, safeEqual, verifyPassword } from '../lib/crypto.js';
+import { hashPassword, verifyPassword } from '../lib/crypto.js';
 import { clearSession, issueCsrfToken, issueSession } from '../lib/tokens.js';
-import { ROLES, type Role } from '../lib/types.js';
+import { ROLES } from '../lib/types.js';
 import { requireAuth } from '../middleware/auth.js';
 import * as usersRepo from '../repositories/users.repo.js';
 import { actorFrom, logAction } from '../repositories/audit.repo.js';
@@ -38,7 +37,6 @@ const registerSchema = z.object({
     .regex(/^[a-zA-Z0-9._-]+$/, 'Логин: латиница, цифры, точка, дефис, подчёркивание'),
   password: z.string().min(6, 'Пароль: минимум 6 символов').max(72, 'Пароль: максимум 72 символа'),
   role: z.enum(ROLES),
-  secret: z.string().max(200).optional(),
 });
 
 const loginSchema = z.object({
@@ -54,18 +52,6 @@ const pinLoginSchema = z.object({
     .trim()
     .regex(/^\d{4}$/, 'PIN состоит из 4 цифр'),
 });
-
-const MAX_ADMINS: Record<'MONITOR' | 'CURATOR', number> = { MONITOR: 3, CURATOR: 3 };
-
-/** Секретные коды существуют только на сервере (process.env) и проверяются здесь. */
-function checkSecret(role: Role, provided: string | undefined): void {
-  if (role === 'STUDENT') return;
-
-  const expected = role === 'MONITOR' ? config.secrets.monitor : config.secrets.curator;
-  if (!provided || !safeEqual(provided, expected)) {
-    throw forbidden('Неверный секретный код для этой роли');
-  }
-}
 
 /** GET, а не POST: иначе запрос сам попал бы под CSRF-защиту. */
 authRouter.get(
@@ -83,17 +69,10 @@ authRouter.post(
     if (!parsed.success) {
       throw badRequest(parsed.error.issues.map((i) => i.message).join('; '), 'VALIDATION');
     }
-    const { firstName, lastName, username, password, role, secret } = parsed.data;
-
-    checkSecret(role, secret);
+    const { firstName, lastName, username, password, role } = parsed.data;
 
     if (usersRepo.findByUsername(username)) {
       throw conflict('Такой логин уже занят');
-    }
-
-    const adminCount = usersRepo.countByRole(role as 'MONITOR' | 'CURATOR');
-    if (role !== 'STUDENT' && adminCount >= MAX_ADMINS[role]) {
-      throw conflict(`Все аккаунты роли «${role === 'MONITOR' ? 'Староста' : 'Куратор'}» уже заняты`);
     }
 
     const passwordHash = await hashPassword(password);

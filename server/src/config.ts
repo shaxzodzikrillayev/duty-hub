@@ -57,13 +57,11 @@ if (isProd && (jwtSecret.length < 32 || jwtSecret === 'dev-only-secret-change-me
   throw new Error('В production необходимо задать случайный JWT_SECRET длиной не менее 32 символов');
 }
 
-/** Секреты регистрации живут ТОЛЬКО на сервере и никогда не покидают его. */
-const monitorSecret = required('MONITOR_SECRET');
-const curatorSecret = required('CURATOR_SECRET');
-
-if (monitorSecret === curatorSecret) {
-  throw new Error('MONITOR_SECRET и CURATOR_SECRET должны различаться');
-}
+/**
+ * Секретных кодов регистрации больше нет: роль выбирается при регистрации
+ * свободно, поэтому MONITOR_SECRET и CURATOR_SECRET не нужны ни серверу,
+ * ни переменным окружения на хостинге.
+ */
 
 const databasePathRaw = process.env.DATABASE_PATH?.trim() || (isVercel ? '/tmp/dutyhub/dutyhub.db' : './data/dutyhub.db');
 const databaseFile = path.isAbsolute(databasePathRaw)
@@ -82,10 +80,6 @@ export const config = {
   cookieName: 'dh_session',
   csrfCookieName: 'dh_csrf',
   csrfHeader: 'x-csrf-token',
-  secrets: {
-    monitor: monitorSecret,
-    curator: curatorSecret,
-  },
   databaseFile,
   allowedOrigins: (process.env.ALLOWED_ORIGINS ?? '')
     .split(',')

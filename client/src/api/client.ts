@@ -147,7 +147,6 @@ export const api = {
       username: string;
       password: string;
       role: Role;
-      secret?: string;
     }) => request<{ user: User }>('POST', '/api/auth/register', payload),
     people: () => request<{ people: { id: number; firstName: string; lastName: string; fullName: string; role: Role }[] }>('GET', '/api/auth/people'),
     loginPin: (userId: number, pin: string) =>
